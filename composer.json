@@ -1,0 +1,30 @@
+{
+    "name": "orklah/psalm-use-constants",
+    "description": "Fix the code to use existing constants instead of literals when available",
+    "type": "psalm-plugin",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "orklah"
+        }
+    ],
+    "extra": {
+        "psalm" : {
+            "pluginClass": "Orklah\\UseConstants\\Plugin"
+        }
+    },
+    "require": {
+        "php": "^7.3",
+        "vimeo/psalm": "^4.6.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Orklah\\UseConstants\\": ["./src"]
+        }
+    },
+    "require-dev": {
+        "nikic/php-parser": "^4.0",
+        "phpunit/phpunit": "^9.5",
+        "psalm/plugin-phpunit": "^0.15.0"
+    }
+}
