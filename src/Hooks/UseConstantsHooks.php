@@ -5,20 +5,28 @@ namespace Orklah\UseConstants\Hooks;
 use PhpParser\Node\Scalar\String_;
 use Psalm\FileManipulation;
 use Psalm\Internal\Analyzer\ClassLikeAnalyzer;
-use Psalm\Plugin\EventHandler\AfterClassLikeAnalysisInterface;
+use Psalm\Plugin\EventHandler\AfterClassLikeVisitInterface;
 use Psalm\Plugin\EventHandler\AfterExpressionAnalysisInterface;
-use Psalm\Plugin\EventHandler\Event\AfterClassLikeAnalysisEvent;
+use Psalm\Plugin\EventHandler\Event\AfterClassLikeVisitEvent;
 use Psalm\Plugin\EventHandler\Event\AfterExpressionAnalysisEvent;
 use function count;
+use function in_array;
 use function strlen;
 
 
-class UseConstantsHooks implements AfterExpressionAnalysisInterface, AfterClassLikeAnalysisInterface
+class UseConstantsHooks implements AfterExpressionAnalysisInterface, AfterClassLikeVisitInterface
 {
     private static $list_values = [];
+    private static $forbidden_list = [];
 
     public static function afterExpressionAnalysis(AfterExpressionAnalysisEvent $event): ?bool
     {
+        global $argv; // please look away but I need this to ensure this plugin was called without cache
+
+        if(!in_array('--no-cache', $argv, true)){
+            die('Please run orklah/psalm-use-constants with --no-cache to ensure correct collect of constants');
+        }
+
         if (!$event->getCodebase()->alter_code) {
             //return true;
         }
@@ -47,9 +55,9 @@ class UseConstantsHooks implements AfterExpressionAnalysisInterface, AfterClassL
         return true;
     }
 
-    public static function afterStatementAnalysis(AfterClassLikeAnalysisEvent $event)
+    public static function afterClassLikeVisit(AfterClassLikeVisitEvent $event)
     {
-        $classlike_storage = $event->getClasslikeStorage();
+        $classlike_storage = $event->getStorage();
         foreach ($classlike_storage->constants as $constant_name => $constant) {
             if ($constant->visibility !== ClassLikeAnalyzer::VISIBILITY_PUBLIC) {
                 //TODO: this may be refined to promote use of private const
@@ -62,8 +70,15 @@ class UseConstantsHooks implements AfterExpressionAnalysisInterface, AfterClassL
             if ($constant->type->hasLiteralString() && count($constant->type->getLiteralStrings()) === 1) {
                 $literal_values = $constant->type->getLiteralStrings();
                 $literal_value = array_shift($literal_values)->value;
-                if (strlen($literal_value) < 2) {
+                if (strlen($literal_value) < 2 || in_array($literal_value, self::$forbidden_list, true)) {
                     //will lead to too much false positives
+                    return true;
+                }
+                if (isset(self::$list_values[$literal_value])) {
+                    //if we already had a constant for this value, we'll unset it and add this value to a forbiddent list
+                    //this will reduce ambinguities and false positives
+                    unset(self::$list_values[$literal_value]);
+                    self::$forbidden_list[] = $literal_value;
                     return true;
                 }
                 self::$list_values[$literal_value] = [$classlike_storage->name, $constant_name];
