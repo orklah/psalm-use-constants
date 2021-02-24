@@ -24,16 +24,16 @@ class UseConstantsHooks implements AfterExpressionAnalysisInterface, AfterClassL
         }
 
         $original_expr = $event->getExpr();
-        if(!$original_expr instanceof String_){
+        if (!$original_expr instanceof String_) {
             return true;
         }
 
-        if(strlen($original_expr->value) < 2){
+        if (strlen($original_expr->value) < 2) {
             //will lead to too much false positives
             return true;
         }
 
-        if(!isset(self::$list_values[$original_expr->value])){
+        if (!isset(self::$list_values[$original_expr->value])) {
             return true;
         }
 
@@ -50,15 +50,19 @@ class UseConstantsHooks implements AfterExpressionAnalysisInterface, AfterClassL
     public static function afterStatementAnalysis(AfterClassLikeAnalysisEvent $event)
     {
         $classlike_storage = $event->getClasslikeStorage();
-        foreach($classlike_storage->constants as $constant_name => $constant){
-            if($constant->visibility !== ClassLikeAnalyzer::VISIBILITY_PUBLIC){
+        foreach ($classlike_storage->constants as $constant_name => $constant) {
+            if ($constant->visibility !== ClassLikeAnalyzer::VISIBILITY_PUBLIC) {
                 //TODO: this may be refined to promote use of private const
                 continue;
             }
-            if($constant->type->hasLiteralString() && count($constant->type->getLiteralStrings()) === 1){
+            if ($constant->type === null) {
+                //when a constant has no type?
+                return true;
+            }
+            if ($constant->type->hasLiteralString() && count($constant->type->getLiteralStrings()) === 1) {
                 $literal_values = $constant->type->getLiteralStrings();
                 $literal_value = array_shift($literal_values)->value;
-                if(strlen($literal_value) < 2){
+                if (strlen($literal_value) < 2) {
                     //will lead to too much false positives
                     return true;
                 }
