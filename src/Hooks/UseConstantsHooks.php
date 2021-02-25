@@ -101,7 +101,7 @@ class UseConstantsHooks implements AfterExpressionAnalysisInterface, AfterClassL
                     continue;
                 }
 
-                self::$list_values[$literal_value] = [$classlike_storage->name, $constant_name, $event->getStatementsSource()->getFileName(), $constant->location->getLineNumber()];
+                self::$list_values[$literal_value] = [$classlike_storage->name, $constant_name, $event->getStatementsSource()->getFileName(), $constant->location ? $constant->location->getLineNumber() : null];
             }
         }
     }
