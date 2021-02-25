@@ -50,7 +50,12 @@ class UseConstantsHooks implements AfterExpressionAnalysisInterface, AfterClassL
             return true;
         }
 
-        [$classlike_name, $constant_name] = self::$list_values[$original_expr->value];
+        [$classlike_name, $constant_name, $file_name, $constant_line] = self::$list_values[$original_expr->value];
+        if($original_expr->getLine() === $constant_line && $event->getStatementsSource()->getFileName() === $file_name){
+            //if the literal is on the same file and same line, don't replace
+            return true;
+        }
+
         $fqn = $classlike_name . '::' . $constant_name;
 
         if (in_array($classlike_name, self::$exception_list['class'], true) ||
@@ -96,7 +101,7 @@ class UseConstantsHooks implements AfterExpressionAnalysisInterface, AfterClassL
                     continue;
                 }
 
-                self::$list_values[$literal_value] = [$classlike_storage->name, $constant_name];
+                self::$list_values[$literal_value] = [$classlike_storage->name, $constant_name, $event->getStatementsSource()->getFileName(), $constant->location->getLineNumber()];
             }
         }
     }
