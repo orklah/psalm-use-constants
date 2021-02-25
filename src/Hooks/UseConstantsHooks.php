@@ -19,16 +19,24 @@ class UseConstantsHooks implements AfterExpressionAnalysisInterface, AfterClassL
     private static $list_values = [];
     private static $forbidden_list = [];
 
+    //placeholder for config. PR Psalm to add a Json in plugin tag in xml file?
+    private static $exception_list = [
+        'class' => [],
+        'constant' => [],
+        'fqn' => [],
+        'literal_value' => [],
+    ];
+
     public static function afterExpressionAnalysis(AfterExpressionAnalysisEvent $event): ?bool
     {
         global $argv; // please look away but I need this to ensure this plugin was called without cache
 
-        if(!in_array('--no-cache', $argv, true)){
+        if (!in_array('--no-cache', $argv, true)) {
             die('Please run orklah/psalm-use-constants with --no-cache to ensure correct collect of constants');
         }
 
         if (!$event->getCodebase()->alter_code) {
-            //return true;
+            return true;
         }
 
         $original_expr = $event->getExpr();
@@ -36,16 +44,22 @@ class UseConstantsHooks implements AfterExpressionAnalysisInterface, AfterClassL
             return true;
         }
 
-        if (strlen($original_expr->value) < 2) {
-            //will lead to too much false positives
-            return true;
-        }
+        $literal_value = $original_expr->value;
 
-        if (!isset(self::$list_values[$original_expr->value])) {
+        if (!isset(self::$list_values[$literal_value])) {
             return true;
         }
 
         [$classlike_name, $constant_name] = self::$list_values[$original_expr->value];
+        $fqn = $classlike_name . '::' . $constant_name;
+
+        if (in_array($classlike_name, self::$exception_list['class'], true) ||
+            in_array($constant_name, self::$exception_list['constant'], true) ||
+            in_array($fqn, self::$exception_list['fqn'], true) ||
+            in_array($literal_value, self::$exception_list['literal_value'], true)
+        ) {
+            return true;
+        }
 
         $startPos = $original_expr->getStartFilePos();
         $endPos = $original_expr->getEndFilePos() + 1;
@@ -65,22 +79,23 @@ class UseConstantsHooks implements AfterExpressionAnalysisInterface, AfterClassL
             }
             if ($constant->type === null) {
                 //when a constant has no type?
-                return true;
+                continue;
             }
             if ($constant->type->hasLiteralString() && count($constant->type->getLiteralStrings()) === 1) {
                 $literal_values = $constant->type->getLiteralStrings();
                 $literal_value = array_shift($literal_values)->value;
-                if (strlen($literal_value) < 2 || in_array($literal_value, self::$forbidden_list, true)) {
+                if (strlen($literal_value) < 3 || in_array($literal_value, self::$forbidden_list, true)) {
                     //will lead to too much false positives
-                    return true;
+                    continue;
                 }
                 if (isset(self::$list_values[$literal_value])) {
-                    //if we already had a constant for this value, we'll unset it and add this value to a forbiddent list
+                    //if we already had a constant for this value, we'll unset it and add this value to a forbidden list
                     //this will reduce ambinguities and false positives
                     unset(self::$list_values[$literal_value]);
                     self::$forbidden_list[] = $literal_value;
-                    return true;
+                    continue;
                 }
+
                 self::$list_values[$literal_value] = [$classlike_storage->name, $constant_name];
             }
         }
